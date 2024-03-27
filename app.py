@@ -10,9 +10,19 @@ import seaborn as sns
 @st.cache_resource
 def load_data():
     data = pd.read_csv("WA_Fn-UseC_-HR-Employee-Attrition.csv")
-    return data.copy()
+    columns_to_keep = ['Age', 'Attrition', 'Department', 'DistanceFromHome', 
+                       'Education', 'EducationField', 'JobRole', 'MaritalStatus', 'MonthlyIncome']
+    return data[columns_to_keep].copy()
 
 data = load_data()
+
+# Define function to encode categorical variables
+def encode_categorical(data):
+    categorical_cols = ['Department', 'Education', 'EducationField', 'JobRole', 'MaritalStatus']
+    label_encoder = LabelEncoder()
+    for col in categorical_cols:
+        data[col] = label_encoder.fit_transform(data[col])
+    return data
 
 # Sidebar for user input
 st.sidebar.title("Employee Attrition Prediction")
@@ -66,14 +76,24 @@ elif selected_radio == "Visualization":
 else:  # Prediction
     st.subheader("Prediction")
     st.write("Employee Feature Input")
+    st.write("Data Head:")
+    st.write(data.head())
+
     user_input = {}
     for column in data.columns:
-        if column != 'Attrition':
-            if data[column].dtype == object:
-                user_input[column] = st.selectbox(f"Select {column}", data[column].unique())
-            else:
-                user_input[column] = st.number_input(f"Enter {column}", value=0)
+        if column != 'Attrition' and data[column].dtype == object:
+            user_input[column] = st.selectbox(f"Select {column}", data[column].unique())
+        elif column != 'Attrition' and data[column].dtype != object:
+            user_input[column] = st.number_input(f"Enter {column}", value=0)
+
+    st.write("Selected Input Features:")
+    input_df = pd.DataFrame(user_input, index=[0])
+    st.table(input_df)
+
     if st.button("Predict"):
+        # Encode categorical variables
+        input_df_encoded = encode_categorical(input_df)
+
         # Data preprocessing
         data.dropna(inplace=True)
         label_encoder = LabelEncoder()
@@ -84,15 +104,13 @@ else:  # Prediction
         # Model training
         X = data.drop('Attrition', axis=1)
         y = data['Attrition']
+
+        # Train the logistic regression model
         model = LogisticRegression(max_iter=1000)
         model.fit(X, y)
 
         # Make prediction
-        input_df = pd.DataFrame([user_input])
-        for column in input_df.columns:
-            if input_df[column].dtype == object:
-                input_df[column] = label_encoder.transform(input_df[column])
-        prediction = model.predict(input_df)
+        prediction = model.predict(input_df_encoded)
         if prediction[0] == 0:
             st.write("Employee is likely to stay.")
         else:
