@@ -2,7 +2,7 @@
 import streamlit as st
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -10,8 +10,8 @@ import seaborn as sns
 @st.cache_resource
 def load_data():
     data = pd.read_csv("WA_Fn-UseC_-HR-Employee-Attrition.csv")
-    columns_to_keep = ['Age', 'Attrition', 'Department', 'DistanceFromHome', 
-                       'Education', 'EducationField', 'JobRole', 'MaritalStatus', 'MonthlyIncome']
+    columns_to_keep = ['Age', 'MonthlyIncome', 'Department', 'DistanceFromHome', 
+                       'Education', 'EducationField', 'JobRole', 'MaritalStatus']
     return data[columns_to_keep].copy()
 
 data = load_data()
@@ -20,16 +20,33 @@ data = load_data()
 def encode_categorical(data):
     categorical_cols = ['Department', 'Education', 'EducationField', 'JobRole', 'MaritalStatus']
     label_encoder = LabelEncoder()
+    encoded_cols = {}
     for col in categorical_cols:
         data[col] = label_encoder.fit_transform(data[col])
+        encoded_cols[col] = label_encoder
+    return data, encoded_cols
+
+# Define function to decode categorical variables
+def decode_categorical(data):
+    decode_map = {
+        'Department': {0: 'Human Resources', 1: 'Research & Development', 2: 'Sales'},
+        'Education': {0: 'Below College', 1: 'College', 2: 'Bachelor', 3: 'Master', 4: 'Doctor'},
+        'EducationField': {0: 'Human Resources', 1: 'Life Sciences', 2: 'Marketing', 3: 'Medical', 4: 'Other', 5: 'Technical Degree'},
+        'JobRole': {0: 'Healthcare Representative', 1: 'Human Resources', 2: 'Laboratory Technician', 3: 'Manager', 4: 'Manufacturing Director', 5: 'Research Director', 6: 'Research Scientist', 7: 'Sales Executive', 8: 'Sales Representative'},
+        'MaritalStatus': {0: 'Divorced', 1: 'Married', 2: 'Single'}
+    }
+    
+    for col in decode_map.keys():
+        data[col] = data[col].map(decode_map[col])
+    
     return data
 
 # Sidebar for user input
-st.sidebar.title("Employee Attrition Prediction")
+st.sidebar.title("Employee Salary Prediction")
 selected_radio = st.sidebar.radio("Select", ("Background", "Visualization", "Prediction"))
 
 # Display project description and problem statement
-st.title("Employee Attrition Prediction")
+st.title("Employee Salary Prediction")
 
 # Show relevant sections based on selected radio button
 if selected_radio == "Background":
@@ -41,14 +58,32 @@ if selected_radio == "Background":
     st.write("- Lasso Regression")
     st.write("- Logistic Regression (for binary classification)")
     st.write("")
-    st.write("Project Title: Employee Attrition Prediction")
-    st.write("In this project, we aim to predict employee attrition using logistic regression.")
+    st.subheader("Project Title: Employee Salary Prediction")
+    st.write("In this project, we aim to predict employee salary using linear regression.")
     st.write("")
-    st.write("Background Problem")
-    st.write("Employee attrition, or turnover, refers to the rate at which employees leave an organization. High employee attrition can be costly for businesses due to the expenses associated with hiring and training new employees, as well as the potential loss of productivity and morale within the organization.")
+    # Background Problem
     st.write("")
-    st.write("Objective")
-    st.write("The objective of this project is to build a predictive model that can identify employees who are likely to leave the organization. By predicting employee attrition, organizations can take proactive measures to retain valuable employees and improve overall employee satisfaction and retention rates.")
+    st.subheader("**Background Problem:**")
+
+    st.write("Key Challenges:")
+    st.write("1. Ensuring fair compensation practices")
+    st.write("2. Budgeting and resource allocation")
+    st.write("3. Talent acquisition and retention")
+    st.write("4. Performance management and career development")
+
+# Project Objective
+    st.write("")
+    st.subheader("Objective:")
+
+
+    st.write("The objective of this project is to:")
+    st.write("1. Develop a predictive model to estimate employee salaries using linear regression.")
+    st.write("2. Optimize recruitment processes by leveraging salary predictions for candidate selection and negotiation.")
+    st.write("3. Ensure fair compensation practices by benchmarking salaries and identifying disparities.")
+    st.write("4. Retain top talent by offering competitive compensation packages informed by the predictive model.")
+    st.write("5. Support strategic decision-making through accurate salary forecasts and insights into salary-related trends.")
+
+
 
 elif selected_radio == "Visualization":
     st.subheader("Visualization")
@@ -81,18 +116,21 @@ else:  # Prediction
 
     user_input = {}
     for column in data.columns:
-        if column != 'Attrition' and data[column].dtype == object:
+        if column != 'MonthlyIncome' and data[column].dtype == object:
             user_input[column] = st.selectbox(f"Select {column}", data[column].unique())
-        elif column != 'Attrition' and data[column].dtype != object:
+        elif column != 'MonthlyIncome' and data[column].dtype != object:
             user_input[column] = st.number_input(f"Enter {column}", value=0)
 
     st.write("Selected Input Features:")
     input_df = pd.DataFrame(user_input, index=[0])
     st.table(input_df)
 
-    if st.button("Predict"):
+    if st.button("Predict Salary"):
+        # Decode categorical variables
+        decoded_input_df = decode_categorical(input_df)
+
         # Encode categorical variables
-        input_df_encoded = encode_categorical(input_df)
+        input_df_encoded, _ = encode_categorical(decoded_input_df)
 
         # Data preprocessing
         data.dropna(inplace=True)
@@ -102,16 +140,13 @@ else:  # Prediction
                 data[column] = label_encoder.fit_transform(data[column])
 
         # Model training
-        X = data.drop('Attrition', axis=1)
-        y = data['Attrition']
+        X = data.drop('MonthlyIncome', axis=1)
+        y = data['MonthlyIncome']
 
-        # Train the logistic regression model
-        model = LogisticRegression(max_iter=1000)
+        # Train the linear regression model
+        model = LinearRegression()
         model.fit(X, y)
 
         # Make prediction
         prediction = model.predict(input_df_encoded)
-        if prediction[0] == 0:
-            st.write("Employee is likely to stay.")
-        else:
-            st.write("Employee is likely to leave.")
+        st.write(f"Predicted Salary: ${prediction[0]:,.2f}")
